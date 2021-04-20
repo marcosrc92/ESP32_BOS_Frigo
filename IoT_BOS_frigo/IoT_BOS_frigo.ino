@@ -261,7 +261,7 @@ void maquina_estados(int estado_f) {
       break;
 
     case 2: //alarma SALIDA BUZZER
-      timerAlarmEnable(timer_parp);
+      timerAlarmDisable(timer_parp);
       if (estado_ACK == 0 && en_mails){
         String result = sendEmail(asunto, remitente, "La temperatura del frigorifico es demasiado alta", "marcosrc1992@gmail.com", false);
         for(user=0; user<NUM_USERS; user++){
@@ -271,6 +271,8 @@ void maquina_estados(int estado_f) {
       estado_OK = 0;
       estado_ACK = 1;
       estado_revision = 0;
+
+      digitalWrite(P_BUZZALM, HIGH);
       //color rojo
       digitalWrite(P_LEDOK, LOW);
       digitalWrite(P_LEDALM, HIGH);
@@ -395,9 +397,10 @@ void IRAM_ATTR parp_mantenimiento(){
     digitalWrite(P_LEDOK, parp1Hz);
     digitalWrite(P_LEDALM, parp1Hz);
   }
-
+/*
   if(estado == 2)
     digitalWrite(P_BUZZALM, parp1Hz);
+    */
 }
 
 /******************************************************************************************/
