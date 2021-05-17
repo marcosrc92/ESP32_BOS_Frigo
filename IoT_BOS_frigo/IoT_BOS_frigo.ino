@@ -1,4 +1,3 @@
-
 #include <Arduino.h>
 #include <WiFi.h>
 #include "ESP32_MailClient.h"
@@ -6,16 +5,17 @@
 #include <UniversalTelegramBot.h>
 #include <esp32-hal-timer.h>
 
-
 /****************************************************************************************/
 /************************DEFINICIONES DE CONFIGURACION***********************************/
 /****************************************************************************************/
 
-#define WIFI_SSID "Inycom"
-#define WIFI_PASSWORD "Enriqueway"
+#define WIFI_SSID "valmei"
+#define WIFI_PASSWORD "valmeilab"
 
 #define GMAIL_SMTP_SERVER "smtp.gmail.com"
 #define GMAIL_SMTP_PORT 465
+#define OUTLOOK_SMTP_SERVER "smtp.office365.com"
+#define OUTLOOK_SMTP_PORT 587
 
 /* Credenciales e-mail */
 #define GMAIL_SMTP_USERNAME "marcosrc1992.inycom@gmail.com"
@@ -26,13 +26,12 @@
 #define P_ACK 19      //modo INPUT_PULLUP con ISR a flanco descencente (Digital)
 #define P_LEDOK 17    //modo OUTPUT (Digital)
 #define P_LEDALM 16   //modo OUTPUT (Digital)
-#define P_BUZZALM 15  //modo OUTPUT (Digital)
+#define P_BUZZALM 12  //modo OUTPUT (Digital)
 //La Pt100 se encuentra en el 34
 
-#define N_TIMERMAX 8  //tiempo en horas para que salte la alarma
-#define N_INTENTOS_WIFI_MAX 300
+#define N_TIMERMAX 480  //tiempo en medias horas para que salte la alarma
+#define N_INTENTOS_WIFI_MAX 30
 
-//Conseguir con Bot Father
 #define BOT_TOKEN "1769477105:AAEoHzDoJ5YO7-LEhH_NC4aoRSqDFrxcKGw"
 #define NUM_USERS 2
 
@@ -40,10 +39,10 @@
 /************************VARIABLES DE CONFIGURACION**************************************/
 /****************************************************************************************/
 
-bool en_mails = 0; //permiso de mandar emails, se modifica solo aqui. 0 = deshabilita; 1 = habilita
+bool en_mails = 1; //permiso de mandar emails, se modifica solo aqui. 0 = deshabilita; 1 = habilita
 
 //un array para comprobar si es usario autorizado se debe modificar NUM_USERS en los #define dependiendo del numero de usuarios autorizados
-String CHAT_ID[NUM_USERS] = {"1769646176", "13573996"};
+String CHAT_ID[NUM_USERS] = {"1769646176", "1395683047"};
 
 /****************************************************************************************/
 /****************************************************************************************/
@@ -65,8 +64,11 @@ int estado = 0;
 const int P_pt100 = 34;
 float pt100Value = 0;
 float temp_actual = 0;
+float temp_preop = 0;
 
 //variables de estado
+bool initW = 0;
+bool estado_arranque = 0;
 bool estado_OK = 0;
 bool estado_ACK = 0;
 bool estadoLEDWIFI = LOW; //LOW = 0x0
@@ -80,7 +82,7 @@ char* asunto = "Actualizacion estado frigorifico";
 //configuracion del timer
 hw_timer_t * timer = NULL;
 void IRAM_ATTR onTimer(); //Declaracion de funcion de interrupción de timer
-volatile int interruptCounter = 0;
+volatile long interruptCounter = 0;
 
 hw_timer_t * timer_parp = NULL;
 void IRAM_ATTR parp_mantenimiento(); //Declaracion de funcion de interrupción de timer
@@ -90,7 +92,6 @@ void IRAM_ATTR check_wifi(); //Declaracion de funcion de interrupción de timer
 
 volatile bool flag_alarma = 0;
 volatile bool flag_timer = 0;
-long int intentos_WIFI = 0;
 
 //Funcion de manejo de mensajes de telegram
 void handleNewMessages(int);
@@ -128,7 +129,7 @@ void setup() {
   pinMode(P_LEDOK, OUTPUT);
   pinMode(P_LEDALM, OUTPUT);
   pinMode(P_BUZZALM, OUTPUT);
-  
+   
   //config del pin de interrupcion de ACK
   attachInterrupt(P_ACK, ISR_ACK, FALLING);
 
@@ -157,8 +158,9 @@ void setup() {
   timer = timerBegin(0, 65536, true);       //timer 0 PS = 65536 f=1220Hz countUp=true
   timerAttachInterrupt(timer, &onTimer, true);
   //timerAlarmWrite(timer, 1220, true);     //cuenta 1 segundo
-  //timerAlarmWrite(timer, 73200, true);      //cuenta 1 minuto
-  timerAlarmWrite(timer, 4392000, true);  //cuenta 1 hora
+  timerAlarmWrite(timer, 73200, true);      //cuenta 1 minuto
+  //timerAlarmWrite(timer, 2196000, true);  //cuenta 30 min
+  //timerAlarmWrite(timer, 4392000, true);  //cuenta 1 hora
   timerAlarmEnable(timer);
 
   //setup del timer 1 para parpadeos de 1 Hz
@@ -170,24 +172,28 @@ void setup() {
   //setup del timer 2 comprobacion del estado del WiFi
   timer_wifi = timerBegin(2, 65536, true);  //timer 0 PS = 65536 f=1220Hz countUp=true
   timerAttachInterrupt(timer_wifi, &check_wifi, true);
-  //timerAlarmWrite(timer, 73200, true);      //cuenta 1 minuto
-  timerAlarmWrite(timer_wifi, 1098000, true);  //cuenta 15 min
-  timerAlarmEnable(timer_wifi);
+  timerAlarmWrite(timer, 80000, true);      //cuenta 1 min y pico
+  //timerAlarmWrite(timer_wifi, 1098000, true);  //cuenta 15 min
+  timerAlarmDisable(timer_wifi);
 
   //inicializacion de variable temp_actual
    pt100Value = analogRead(P_pt100);
    //pt100Value = 4096; //MOCK ADC
-   temp_actual = -(89.3256 / 4096.0f) * pt100Value - (0.62616 / 4096.0f);
+   //temp_actual = -(89.3256 / 4096.0f) * pt100Value - (0.62616 / 4096.0f);
+   temp_preop = -89.3256 * pt100Value;
+   temp_actual = temp_preop / 4096.0f;
 }
 
 /******************************************************************************************/
 
 void loop() {
-   
+  
   if(flag_timer || flag_ACK){ //entrada periodica con timer 0 o asincrona con pulsacion de ACK
     pt100Value = analogRead(P_pt100);
     //pt100Value = 4096; //MOCK ADC
-    temp_actual = -(89.3256 / 4096.0f) * pt100Value - (0.62616 / 4096.0f);
+    //temp_actual = -(89.3256 / 4096.0f) * pt100Value - (0.62616 / 4096.0f);
+    temp_preop = -89.3256 * pt100Value;
+    temp_actual = temp_preop / 4096.0f;
     
     estados_automaticos();
     maquina_estados(estado);
@@ -197,9 +203,9 @@ void loop() {
     //Serial.println(pt100Value);
   }
 
-  //Serial.println(estado);
-  //Serial.println(flag_alarma);
-
+  if(!initW)
+    timerAlarmEnable(timer_wifi);
+  initW = 1;
 
    if (millis() > lastTimeBotRan + botRequestDelay)  {
     int numNewMessages = bot.getUpdates(bot.last_message_received + 1);
@@ -227,27 +233,35 @@ void maquina_estados(int estado_f) {
       estado_ACK = 0;
       estado_revision = 0;
       flag_alarma = 0;
-            
+
+
       digitalWrite(P_LEDOK, LOW);
       digitalWrite(P_LEDALM, LOW);
 
       digitalWrite(P_BUZZALM, LOW);
-      Serial.println("Proceso de arranque, esperando hasta 8 horas a que baje de -65 ºC");
-      /*
-      for(user=0; user<NUM_USERS; user++){
-         bot.sendMessage(CHAT_ID[user], "Proceso de arranque, esperando hasta 8 horas a que baje de -65 ºC", "");
+      
+      if(!estado_arranque){
+        for(user=0; user<NUM_USERS; user++){
+          Serial.println("Proceso de arranque, esperando hasta 8 horas a que baje de -65 ºC");
+           bot.sendMessage(CHAT_ID[user], "Proceso de arranque, esperando hasta 8 horas a que baje de -65 ºC", "");
+        }
       }
-      */
+      
+      estado_arranque = 1;
+      
       break;
 
     case 1: //todo OK
       timerAlarmDisable(timer_parp);
       if (estado_OK == 0 && en_mails){
-        String result = sendEmail(asunto, remitente, "El estado del frigorifico es correcto", "marcosrc1992@gmail.com", false);
+        String result1 = sendEmail(asunto, remitente, "El estado del frigorifico es correcto", "ruben.martinezm@inycom.es", false);
+        String result2 = sendEmail(asunto, remitente, "El estado del frigorifico es correcto", "marcos.rodriguez@inycom.es", false);
+        String result3 = sendEmail(asunto, remitente, "El estado del frigorifico es correcto", "valledorluis@uniovi.es", false);
         for(user=0; user<NUM_USERS; user++){
           bot.sendMessage(CHAT_ID[user], "El estado del frigorifico es correcto", "");
         }
       }
+      estado_arranque = 0;
       estado_OK = 1;
       estado_ACK = 0;
       estado_revision = 0;
@@ -263,11 +277,14 @@ void maquina_estados(int estado_f) {
     case 2: //alarma SALIDA BUZZER
       timerAlarmDisable(timer_parp);
       if (estado_ACK == 0 && en_mails){
-        String result = sendEmail(asunto, remitente, "La temperatura del frigorifico es demasiado alta", "marcosrc1992@gmail.com", false);
+        String result1 = sendEmail(asunto, remitente, "La temperatura del frigorifico es demasiado alta", "ruben.martinezm@inycom.es", false);
+        String result2 = sendEmail(asunto, remitente, "La temperatura del frigorifico es demasiado alta", "marcos.rodriguez@inycom.es", false);
+        String result3 = sendEmail(asunto, remitente, "La temperatura del frigorifico es demasiado alta", "valledorluis@uniovi.es", false);
         for(user=0; user<NUM_USERS; user++){
           bot.sendMessage(CHAT_ID[user], "La temperatura del frigorifico es demasiado alta", "");
         }
       }
+      estado_arranque = 0;
       estado_OK = 0;
       estado_ACK = 1;
       estado_revision = 0;
@@ -281,11 +298,14 @@ void maquina_estados(int estado_f) {
     case 3: //en revision
       timerAlarmEnable(timer_parp);
       if (estado_revision == 0 && en_mails){
-        String result = sendEmail(asunto, remitente, "El frigorifico se encuentra en revision", "marcosrc1992@gmail.com", false);
+        String result1 = sendEmail(asunto, remitente, "El frigorifico se encuentra en revision", "ruben.martinezm@inycom.es", false);
+        String result2 = sendEmail(asunto, remitente, "El frigorifico se encuentra en revision", "marcos.rodriguez@inycom.es", false);
+        String result3 = sendEmail(asunto, remitente, "El frigorifico se encuentra en revision", "valledorluis@uniovi.es", false);
         for(user=0; user<NUM_USERS; user++){
           bot.sendMessage(CHAT_ID[user], "El frigorifico se encuentra en revision", "");
         }
       }
+      estado_arranque = 0;
       estado_OK = 0;
       estado_ACK = 0;
       estado_revision = 1;
@@ -300,11 +320,14 @@ void maquina_estados(int estado_f) {
     case 4: //revisado
       timerAlarmDisable(timer_parp);
       if (estado_revision == 1 && en_mails){
-        String result = sendEmail(asunto, remitente, "El frigorifico esta revisado", "marcosrc1992@gmail.com", false);
+        String result1 = sendEmail(asunto, remitente, "El frigorifico esta revisado", "ruben.martinezm@inycom.es", false);
+        String result2 = sendEmail(asunto, remitente, "El frigorifico esta revisado", "marcos.rodriguez@inycom.es", false);
+        String result3 = sendEmail(asunto, remitente, "El frigorifico esta revisado", "valledorluis@uniovi.es", false);
         for(user=0; user<NUM_USERS; user++){
           bot.sendMessage(CHAT_ID[user], "El frigorifico esta revisado", "");
         }
       }
+      estado_arranque = 0;
       estado_OK = 0;
       estado_ACK = 0;
       estado_revision = 0;
@@ -316,7 +339,7 @@ void maquina_estados(int estado_f) {
       digitalWrite(P_LEDOK, HIGH);
       digitalWrite(P_LEDALM, HIGH);
 
-      break;
+    break;
   } //fin switch
   return;
 }
@@ -330,10 +353,10 @@ void estados_automaticos() {
   else if ((estado == 0 || estado == 4)&& flag_alarma) //alarma por tiempo al haber entrado N veces en el timer 0 sin haber reiniciado el contador de entrada
     estado = 2;
 
-  else if (estado == 1 && temp_actual >= -60.f)
+  else if (estado == 1 && temp_actual >= -60.0f)
     estado = 2;
 
-  else if (estado == 2 && temp_actual <= -70.f)
+  else if (estado == 2 && temp_actual <= -70.0f)
     estado = 1;
   return;
 }
@@ -353,7 +376,7 @@ void IRAM_ATTR ISR_ACK() {
   if (estado == 4) //falso error
     estado = 1;
     
-  if (estado == 3) //fin mantenimiento
+  else if (estado == 3) //fin mantenimiento
     estado = 4;
 
   else if (estado == 2) //inicio mantenimiento
@@ -406,34 +429,40 @@ void IRAM_ATTR parp_mantenimiento(){
 /******************************************************************************************/
 
 void IRAM_ATTR check_wifi(){
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  long int intentos_WIFI = 0;
+  int periodo = 1000;
+  unsigned long TiempoAhora = 0;
+  bool estadoLEDWIFI_f = LOW;
+  
   while (WiFi.status() != WL_CONNECTED && intentos_WIFI < N_INTENTOS_WIFI_MAX){
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     intentos_WIFI++;    
     
-    if (estadoLEDWIFI == LOW) 
-      estadoLEDWIFI = HIGH; 
+    if (estadoLEDWIFI_f == LOW) 
+      estadoLEDWIFI_f = HIGH; 
     else
-      estadoLEDWIFI = LOW;
+      estadoLEDWIFI_f = LOW;
     
-    digitalWrite(P_LEDWIFI, estadoLEDWIFI); 
+    digitalWrite(P_LEDWIFI, estadoLEDWIFI_f); 
     Serial.print(".");
 
-    delay(140);
+    TiempoAhora = millis();
+    while(millis() < TiempoAhora+periodo);  // espere [periodo] milisegundos
   }
   
   if(intentos_WIFI >= N_INTENTOS_WIFI_MAX) 
     digitalWrite(P_LEDWIFI, LOW);
-  else 
+  else {
     digitalWrite(P_LEDWIFI, HIGH);
-    
-  Serial.println("WiFi connected.");
-  intentos_WIFI = 0;
+    Serial.println("WiFi connected.");
+  }
 }
 
 /******************************************************************************************/
 
 void handleNewMessages(int numNewMessages) {
   //Serial.println("handleNewMessages");
+  int user = 0;
   Serial.println(String(numNewMessages));
   for (int i=0; i<numNewMessages; i++) {
     // Chat id of the requester
@@ -467,6 +496,40 @@ void handleNewMessages(int numNewMessages) {
       bot.sendMessage(chat_id, String(temp_actual), "");
       //ledState = HIGH;
       //digitalWrite(P_LEDOK, HIGH);
+    }
+
+    if (text == "/estado") {
+      switch(estado){
+        case 0:
+          for(user=0; user<NUM_USERS; user++){
+            bot.sendMessage(CHAT_ID[user], "Iniciando arranque de la placa de control", "");
+          }
+        break;
+
+        case 1:
+          for(user=0; user<NUM_USERS; user++){
+            bot.sendMessage(CHAT_ID[user], "El estado del frigorifico es correcto", "");
+          }
+        break;
+
+        case 2:
+          for(user=0; user<NUM_USERS; user++){
+            bot.sendMessage(CHAT_ID[user], "La temperatura del frigorifico es demasiado alta", "");
+          }
+        break;
+
+        case 3:
+          for(user=0; user<NUM_USERS; user++){
+            bot.sendMessage(CHAT_ID[user], "El frigorifico se encuentra en revision", "");
+          }
+        break;
+
+        case 4:
+          for(user=0; user<NUM_USERS; user++){
+            bot.sendMessage(CHAT_ID[user], "El frigorifico esta revisado", "");
+          }
+        break;
+      }
     }
     
     /*
