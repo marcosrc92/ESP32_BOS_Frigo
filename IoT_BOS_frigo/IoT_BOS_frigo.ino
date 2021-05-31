@@ -1,19 +1,13 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <ESP32_MailClient.h>
-#include <WiFiClientSecure.h>
+#include "WiFiClientSecure.h"
 #include <UniversalTelegramBot.h>
 #include <esp32-hal-timer.h>
 
 /****************************************************************************************/
-/************************DEFINICIONES DE CONFIGURACION***********************************/
+/*******************DEFINICIONES DE CONFIGURACION (NO TOCAR)*****************************/
 /****************************************************************************************/
-#define WIFI_SSID "valmei"
-#define WIFI_PASSWORD "valmeilab"
-
-//#define WIFI_SSID "BV4900Pro"
-//#define WIFI_PASSWORD "marcosrc92"
-
 #define GMAIL_SMTP_SERVER "smtp.gmail.com"
 #define GMAIL_SMTP_PORT 465
 #define OUTLOOK_SMTP_SERVER "smtp.office365.com"
@@ -31,16 +25,23 @@
 #define P_BUZZALM 12  //modo OUTPUT (Digital)
 //La Pt100 se encuentra en el 34
 
+
 #define N_TIMERMAX 480  //tiempo en medias horas para que salte la alarma
 #define N_INTENTOS_WIFI_MAX 30
 
 #define BOT_TOKEN "1769477105:AAEoHzDoJ5YO7-LEhH_NC4aoRSqDFrxcKGw"
-#define NUM_TEL_USERS 2
-#define NUM_EMAIL_USERS 3
+
 
 /****************************************************************************************/
-/************************VARIABLES DE CONFIGURACION**************************************/
+/*****************VARIABLES DE CONFIGURACION (MODIFICABLE)*******************************/
 /****************************************************************************************/
+#define WIFI_SSID "valmei"
+#define WIFI_PASSWORD "valmeilab"
+
+#define VALOR_CALIBRACION -89.3256
+
+#define NUM_TEL_USERS 2
+#define NUM_EMAIL_USERS 3
 
 bool en_mails = 1; //permiso de mandar emails, se modifica solo aqui. 0 = deshabilita; 1 = habilita
 
@@ -184,9 +185,7 @@ void setup() {
 
   //inicializacion de variable temp_actual
    pt100Value = analogRead(P_pt100);
-   //pt100Value = 4096; //MOCK ADC
-   //temp_actual = -(89.3256 / 4096.0f) * pt100Value - (0.62616 / 4096.0f);
-   temp_preop = -89.3256 * pt100Value;
+   temp_preop = VALOR_CALIBRACION * pt100Value;
    temp_actual = temp_preop / 4096.0f;
 }
 
@@ -199,7 +198,7 @@ void loop() {
   
   if(flag_timer || flag_ACK){ //entrada periodica con timer 0 o asincrona con pulsacion de ACK
     pt100Value = analogRead(P_pt100);
-    temp_preop = -89.3256 * pt100Value;
+    temp_preop = VALOR_CALIBRACION * pt100Value;
     temp_actual = temp_preop / 4096.0f;
     
     estados_automaticos();
