@@ -77,8 +77,10 @@ bool W_conexion = 1;
 bool estado_arranque = 0;
 bool estado_OK = 0;
 bool estado_ACK = 0;
-bool estadoLEDWIFI = LOW; //LOW = 0x0
 bool estado_revision = 0;
+bool estado_revisado = 0;
+
+bool estadoLEDWIFI = LOW; //LOW = 0x0
 volatile bool parp1Hz = LOW; //LOW = 0x0
 
 //nombre del remitente
@@ -123,7 +125,7 @@ String sendEmail(char *subject, char *sender, char *body, char *recipient, boole
   data.addRecipient(recipient);
   if (!MailClient.sendMail(data))
     return MailClient.smtpErrorReason();
-
+  data.empty(); //tras enviar el mail limpio los datos de envio, evitando que se envien múltiples emails (espero)
   return "";
 }
 
@@ -246,28 +248,28 @@ void maquina_estados(int estado_f) {
   
   switch (estado_f) {
     case 0: //arranque inicial
-      estado_OK = 0;
-      estado_ACK = 0;
-      estado_revision = 0;
-      flag_alarma = 0;
 
-
-      digitalWrite(P_LEDOK, LOW);
-      digitalWrite(P_LEDALM, LOW);
-
-      digitalWrite(P_BUZZALM, LOW);
-      
       if(!estado_arranque){
-        estado_arranque = 1;
         for(tel_user=0; tel_user<NUM_TEL_USERS; tel_user++){
            bot.sendMessage(CHAT_ID[tel_user], "Proceso de arranque, esperando hasta 8 horas a que baje de -65 ºC", "");
         }
-      }      
+      }
+      
+      estado_arranque = 1;
+      estado_OK = 0;
+      estado_ACK = 0;
+      estado_revision = 0;
+      estado_revisado = 0;
+      flag_alarma = 0;
+
+      digitalWrite(P_LEDOK, LOW);
+      digitalWrite(P_LEDALM, LOW);
+      digitalWrite(P_BUZZALM, LOW);
+          
     break;
 
     case 1: //todo OK
       if (estado_OK == 0 && en_mails){
-        estado_OK = 1;
         for(email_user=0; email_user<NUM_EMAIL_USERS; email_user++){
           result = sendEmail(asunto, remitente, "El estado del frigorifico es correcto", EMAIL_LIST[email_user], false);
         }
@@ -278,9 +280,12 @@ void maquina_estados(int estado_f) {
           bot.sendMessage(CHAT_ID[tel_user], "El estado del frigorifico es correcto", "");
         }
       }
+      
       estado_arranque = 0;
+      estado_OK = 1;
       estado_ACK = 0;
       estado_revision = 0;
+      estado_revisado = 0;
       flag_alarma = 0;
       
       //color Verde
@@ -292,7 +297,6 @@ void maquina_estados(int estado_f) {
 
     case 2: //alarma SALIDA BUZZER
       if (estado_ACK == 0 && en_mails){
-        estado_ACK = 1;
         for(email_user=0; email_user<NUM_EMAIL_USERS; email_user++){
           result = sendEmail(asunto, remitente, "La temperatura del frigorifico es demasiado alta", EMAIL_LIST[email_user], false);
         }
@@ -305,8 +309,10 @@ void maquina_estados(int estado_f) {
       }
       estado_arranque = 0;
       estado_OK = 0;
+      estado_ACK = 1;
       estado_revision = 0;
-
+      estado_revisado = 0;
+      
       digitalWrite(P_BUZZALM, HIGH);
       //color rojo
       digitalWrite(P_LEDOK, LOW);
@@ -315,7 +321,6 @@ void maquina_estados(int estado_f) {
 
     case 3: //en revision
       if (estado_revision == 0 && en_mails){
-        estado_revision = 1;
         for(email_user=0; email_user<NUM_EMAIL_USERS; email_user++){
           result = sendEmail(asunto, remitente, "El frigorifico se encuentra en revision", EMAIL_LIST[email_user], false);
         }
@@ -329,6 +334,8 @@ void maquina_estados(int estado_f) {
       estado_arranque = 0;
       estado_OK = 0;
       estado_ACK = 0;
+      estado_revision = 1;
+      estado_revisado = 0;
       flag_alarma = 0;
 
       /*naranja parpadeando mediante interrupcion de 1 Hz*/
@@ -338,8 +345,8 @@ void maquina_estados(int estado_f) {
     break;
 
     case 4: //revisado
-      if (estado_revision == 1 && en_mails){
-        estado_revision = 0;
+      if (estado_revisado == 0 && en_mails){
+
         for(email_user=0; email_user<NUM_EMAIL_USERS; email_user++){
           result = sendEmail(asunto, remitente, "El frigorifico esta revisado", EMAIL_LIST[email_user], false);
         }
@@ -353,6 +360,8 @@ void maquina_estados(int estado_f) {
       estado_arranque = 0;
       estado_OK = 0;
       estado_ACK = 0;
+      estado_revision = 0;
+      estado_revisado = 1;
       flag_alarma = 0;
 
       digitalWrite(P_BUZZALM, LOW);
@@ -445,10 +454,6 @@ void IRAM_ATTR parp_mantenimiento(){
 
   if(!W_conexion)
     digitalWrite(P_LEDWIFI, parp1Hz);
-/*
-  if(estado == 2)
-    digitalWrite(P_BUZZALM, parp1Hz);
-    */
 }
 
 /******************************************************************************************/
