@@ -37,8 +37,7 @@
 /****************************************************************************************/
 #define WIFI_SSID "valmei"
 #define WIFI_PASSWORD "valmeilab"
-
-#define VALOR_CALIBRACION -89.3256
+#define VALOR_CALIBRACION -104.0787
 
 #define NUM_TEL_USERS 2
 #define NUM_EMAIL_USERS 3
@@ -164,7 +163,7 @@ void setup() {
 
   //fijar parpadeo del LED
   digitalWrite(P_LEDWIFI, HIGH);
-  Serial.println("WiFi connected.");
+  //Serial.println("WiFi connected.");
 
   secured_client.setCACert(TELEGRAM_CERTIFICATE_ROOT);
 
@@ -187,6 +186,7 @@ void setup() {
    pt100Value = analogRead(P_pt100);
    temp_preop = VALOR_CALIBRACION * pt100Value;
    temp_actual = temp_preop / 4096.0f;
+   //Serial.println(pt100Value);
 }
 
 /******************************************************************************************/
@@ -198,8 +198,9 @@ void loop() {
   
   if(flag_timer || flag_ACK){ //entrada periodica con timer 0 o asincrona con pulsacion de ACK
     pt100Value = analogRead(P_pt100);
-    temp_preop = VALOR_CALIBRACION * pt100Value;
+    temp_preop = VALOR_CALIBRACION * pt100Value;    
     temp_actual = temp_preop / 4096.0f;
+    //Serial.println(pt100Value);
     
     estados_automaticos();
     maquina_estados(estado);
@@ -217,7 +218,7 @@ void loop() {
     W_conexion = 0;
    
   if ((WiFi.status() != WL_CONNECTED) && (W_currentMillis - W_previousMillis >= W_interval)){
-    Serial.println("Reconectando al WiFi");
+    //Serial.println("Reconectando al WiFi");
     WiFi.disconnect();
     WiFi.reconnect();
     W_previousMillis = W_currentMillis;
@@ -226,13 +227,13 @@ void loop() {
    if (millis() > lastTimeBotRan + botRequestDelay)  {
     int numNewMessages = bot.getUpdates(bot.last_message_received + 1);
     while(numNewMessages) {
-      Serial.println("got response");
+      //Serial.println("got response");
       handleNewMessages(numNewMessages);
       numNewMessages = bot.getUpdates(bot.last_message_received + 1);
     }
     lastTimeBotRan = millis();
   }
-  
+    
   delay(100); 
 }
 
@@ -460,7 +461,7 @@ void IRAM_ATTR parp_mantenimiento(){
 void handleNewMessages(int numNewMessages) {
   //Serial.println("handleNewMessages");
   int user = 0;
-  Serial.println(String(numNewMessages));
+  //Serial.println(String(numNewMessages));
   for (int i=0; i<numNewMessages; i++) {
     // Chat id of the requester
     String chat_id = String(bot.messages[i].chat_id);
@@ -477,7 +478,7 @@ void handleNewMessages(int numNewMessages) {
 
     // Print the received message
     String text = bot.messages[i].text;
-    Serial.println(text);
+    //Serial.println(text);
     String from_name = bot.messages[i].from_name;
     
     
