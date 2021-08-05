@@ -37,6 +37,10 @@
 /****************************************************************************************/
 #define WIFI_SSID "valmei"
 #define WIFI_PASSWORD "valmeilab"
+
+//#define WIFI_SSID "BV4900Pro"
+//#define WIFI_PASSWORD "marcosrc92"
+
 #define VALOR_CALIBRACION -104.0787
 
 #define NUM_TEL_USERS 2
@@ -194,7 +198,7 @@ void setup() {
 void loop() {
   unsigned long W_currentMillis = millis();
   
-  digitalWrite(P_LEDOK, HIGH);
+  //digitalWrite(P_LEDOK, HIGH);
   
   if(flag_timer || flag_ACK){ //entrada periodica con timer 0 o asincrona con pulsacion de ACK
     pt100Value = analogRead(P_pt100);
