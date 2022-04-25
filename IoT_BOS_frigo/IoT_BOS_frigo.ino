@@ -18,41 +18,40 @@
 #define GMAIL_SMTP_PASSWORD "Cc985090785"
 
 /* ASIGNACIONES DE PINES DEL ESP32*/
-#define P_LEDWIFI 18  //modo OUTPUT (Digital)
-#define P_ACK 19      //modo INPUT_PULLUP con ISR a flanco descencente (Digital)
-#define P_LEDOK 17    //modo OUTPUT (Digital)
-#define P_LEDALM 16   //modo OUTPUT (Digital)
-#define P_BUZZALM 12  //modo OUTPUT (Digital)
+#define P_LEDWIFI 22  //modo OUTPUT (Digital)
+#define P_ACK 1      //modo INPUT_PULLUP con ISR a flanco descencente (Digital)
+#define P_LEDOK 21    //modo OUTPUT (Digital)
+#define P_LEDALM 17   //modo OUTPUT (Digital)
+#define P_BUZZALM 11  //modo OUTPUT (Digital)
 //La Pt100 se encuentra en el 34
 
 
 #define N_TIMERMAX 480  //tiempo en medias horas para que salte la alarma
 #define N_INTENTOS_WIFI_MAX 30
 
-#define BOT_TOKEN "1769477105:AAEoHzDoJ5YO7-LEhH_NC4aoRSqDFrxcKGw"
+#define BOT_TOKEN "1769477105:AAHHjNkaC8Wydb3qyRCTw6itfpX9a21uET0"
 
 
 /****************************************************************************************/
 /*****************VARIABLES DE CONFIGURACION (MODIFICABLE)*******************************/
 /****************************************************************************************/
-#define WIFI_SSID "valmei"
-#define WIFI_PASSWORD "valmeilab"
+//#define WIFI_SSID "valmei"
+//#define WIFI_PASSWORD "valmeilab"
 
-//#define WIFI_SSID "BV4900Pro"
-//#define WIFI_PASSWORD "marcosrc92"
+#define WIFI_SSID "BV4900Pro"
+#define WIFI_PASSWORD "marcosrc92"
 
-#define VALOR_CALIBRACION -104.0787
-
+#define VALOR_CALIBRACION -33.31
 #define NUM_TEL_USERS 2
-#define NUM_EMAIL_USERS 3
+#define NUM_EMAIL_USERS 2
 
-bool en_mails = 1; //permiso de mandar emails, se modifica solo aqui. 0 = deshabilita; 1 = habilita
+bool en_mails = 0; //permiso de mandar emails, se modifica solo aqui. 0 = deshabilita; 1 = habilita
 
 //un array para comprobar si es usario autorizado se debe modificar NUM_TEL_USERS en los #define dependiendo del numero de usuarios autorizados
 String CHAT_ID[NUM_TEL_USERS] = {"1769646176", "1395683047"};
 
-//el tamaño de este vector es el numero de correos distintos que se van a meter, se debe modificar en los #define
-char* EMAIL_LIST[NUM_EMAIL_USERS] = {"ruben.martinezm@inycom.es", "marcos.rodriguez@inycom.es", "valledorluis@uniovi.es"};
+//el tamaño de este vector es el numero de correos distintos que se van a meter, se debe modificar en los #define NUM_EMAIL_USERS
+char* EMAIL_LIST[NUM_EMAIL_USERS] = {"marcos.rodriguez@inycom.es", "valledorluis@uniovi.es"};
 
 /****************************************************************************************/
 /****************************************************************************************/
@@ -146,7 +145,7 @@ void setup() {
   pinMode(P_BUZZALM, OUTPUT);
    
   //config del pin de interrupcion de ACK
-  attachInterrupt(P_ACK, ISR_ACK, FALLING);
+  attachInterrupt(1, ISR_ACK, CHANGE);
 
   Serial.begin(115200);
   
@@ -188,8 +187,9 @@ void setup() {
 
   //inicializacion de variable temp_actual
    pt100Value = analogRead(P_pt100);
-   temp_preop = VALOR_CALIBRACION * pt100Value;
-   temp_actual = temp_preop / 4096.0f;
+   //temp_preop = VALOR_CALIBRACION * pt100Value;
+   //temp_actual = temp_preop / 4096.0f;
+   temp_actual = pt100Value / VALOR_CALIBRACION;
    //Serial.println(pt100Value);
 }
 
@@ -202,8 +202,9 @@ void loop() {
   
   if(flag_timer || flag_ACK){ //entrada periodica con timer 0 o asincrona con pulsacion de ACK
     pt100Value = analogRead(P_pt100);
-    temp_preop = VALOR_CALIBRACION * pt100Value;    
-    temp_actual = temp_preop / 4096.0f;
+    //temp_preop = VALOR_CALIBRACION * pt100Value;    
+    //temp_actual = temp_preop / 4096.0f;
+    temp_actual = pt100Value / VALOR_CALIBRACION;
     //Serial.println(pt100Value);
     
     estados_automaticos();
@@ -275,13 +276,13 @@ void maquina_estados(int estado_f) {
     case 1: //todo OK
       if (estado_OK == 0 && en_mails){
         for(email_user=0; email_user<NUM_EMAIL_USERS; email_user++){
-          result = sendEmail(asunto, remitente, "El estado del frigorifico es correcto", EMAIL_LIST[email_user], false);
+          result = sendEmail(asunto, remitente, "(test)El estado del frigorifico es correcto", EMAIL_LIST[email_user], false);
         }
 //        result = sendEmail(asunto, remitente, "El estado del frigorifico es correcto", "ruben.martinezm@inycom.es", false);
 //        result = sendEmail(asunto, remitente, "El estado del frigorifico es correcto", "marcos.rodriguez@inycom.es", false);
 //        result = sendEmail(asunto, remitente, "El estado del frigorifico es correcto", "valledorluis@uniovi.es", false);
         for(tel_user=0; tel_user<NUM_TEL_USERS; tel_user++){
-          bot.sendMessage(CHAT_ID[tel_user], "El estado del frigorifico es correcto", "");
+          bot.sendMessage(CHAT_ID[tel_user], "(test)El estado del frigorifico es correcto", "");
         }
       }
       
@@ -302,13 +303,13 @@ void maquina_estados(int estado_f) {
     case 2: //alarma SALIDA BUZZER
       if (estado_ACK == 0 && en_mails){
         for(email_user=0; email_user<NUM_EMAIL_USERS; email_user++){
-          result = sendEmail(asunto, remitente, "La temperatura del frigorifico es demasiado alta", EMAIL_LIST[email_user], false);
+          result = sendEmail(asunto, remitente, "(test)La temperatura del frigorifico es demasiado alta", EMAIL_LIST[email_user], false);
         }
 //        result = sendEmail(asunto, remitente, "La temperatura del frigorifico es demasiado alta", "ruben.martinezm@inycom.es", false);
 //        result = sendEmail(asunto, remitente, "La temperatura del frigorifico es demasiado alta", "marcos.rodriguez@inycom.es", false);
 //        result = sendEmail(asunto, remitente, "La temperatura del frigorifico es demasiado alta", "valledorluis@uniovi.es", false);
         for(tel_user=0; tel_user<NUM_TEL_USERS; tel_user++){
-          bot.sendMessage(CHAT_ID[tel_user], "La temperatura del frigorifico es demasiado alta", "");
+          bot.sendMessage(CHAT_ID[tel_user], "(test)La temperatura del frigorifico es demasiado alta", "");
         }
       }
       estado_arranque = 0;
@@ -326,13 +327,13 @@ void maquina_estados(int estado_f) {
     case 3: //en revision
       if (estado_revision == 0 && en_mails){
         for(email_user=0; email_user<NUM_EMAIL_USERS; email_user++){
-          result = sendEmail(asunto, remitente, "El frigorifico se encuentra en revision", EMAIL_LIST[email_user], false);
+          result = sendEmail(asunto, remitente, "(test)El frigorifico se encuentra en revision", EMAIL_LIST[email_user], false);
         }
 //        result = sendEmail(asunto, remitente, "El frigorifico se encuentra en revision", "ruben.martinezm@inycom.es", false);
 //        result = sendEmail(asunto, remitente, "El frigorifico se encuentra en revision", "marcos.rodriguez@inycom.es", false);
 //        result = sendEmail(asunto, remitente, "El frigorifico se encuentra en revision", "valledorluis@uniovi.es", false);
         for(tel_user=0; tel_user<NUM_TEL_USERS; tel_user++){
-          bot.sendMessage(CHAT_ID[tel_user], "El frigorifico se encuentra en revision", "");
+          bot.sendMessage(CHAT_ID[tel_user], "(test)El frigorifico se encuentra en revision", "");
         }
       }
       estado_arranque = 0;
@@ -352,13 +353,13 @@ void maquina_estados(int estado_f) {
       if (estado_revisado == 0 && en_mails){
 
         for(email_user=0; email_user<NUM_EMAIL_USERS; email_user++){
-          result = sendEmail(asunto, remitente, "El frigorifico esta revisado", EMAIL_LIST[email_user], false);
+          result = sendEmail(asunto, remitente, "(test)El frigorifico esta revisado", EMAIL_LIST[email_user], false);
         }
 //        result = sendEmail(asunto, remitente, "El frigorifico esta revisado", "ruben.martinezm@inycom.es", false);
 //        result = sendEmail(asunto, remitente, "El frigorifico esta revisado", "marcos.rodriguez@inycom.es", false);
 //        result = sendEmail(asunto, remitente, "El frigorifico esta revisado", "valledorluis@uniovi.es", false);
         for(tel_user=0; tel_user<NUM_TEL_USERS; tel_user++){
-          bot.sendMessage(CHAT_ID[tel_user], "El frigorifico esta revisado", "");
+          bot.sendMessage(CHAT_ID[tel_user], "(test)El frigorifico esta revisado", "");
         }
       }
       estado_arranque = 0;
@@ -404,6 +405,7 @@ void estados_automaticos() {
 */
 void IRAM_ATTR ISR_ACK() {
   //cambiar estado cuando se pulsa acuse de recibo (ESTADOS MANUALES)
+  Serial.print("ACK pulsado");
   delay(150); // evita rebotes del pulsador
 
   flag_ACK = 1;
@@ -501,23 +503,23 @@ void handleNewMessages(int numNewMessages) {
    if (text == "/estado") {
       switch(estado){
         case 0:
-            bot.sendMessage(chat_id, "Iniciando arranque de la placa de control", "");
+            bot.sendMessage(chat_id, "(test)Iniciando arranque de la placa de control", "");
         break;
 
         case 1:
-            bot.sendMessage(chat_id, "El estado del frigorifico es correcto", "");
+            bot.sendMessage(chat_id, "(test)El estado del frigorifico es correcto", "");
         break;
 
         case 2:
-            bot.sendMessage(chat_id, "La temperatura del frigorifico es demasiado alta", "");
+            bot.sendMessage(chat_id, "(test)La temperatura del frigorifico es demasiado alta", "");
         break;
 
         case 3:
-            bot.sendMessage(chat_id, "El frigorifico se encuentra en revision", "");
+            bot.sendMessage(chat_id, "(test)El frigorifico se encuentra en revision", "");
         break;
 
         case 4:
-            bot.sendMessage(chat_id, "El frigorifico esta revisado", "");
+            bot.sendMessage(chat_id, "(test)El frigorifico esta revisado", "");
         break;
       }
     }
@@ -526,31 +528,31 @@ void handleNewMessages(int numNewMessages) {
 //      switch(estado){
 //        case 0:
 //          for(user=0; user<NUM_TEL_USERS; user++){
-//            bot.sendMessage(CHAT_ID[user], "Iniciando arranque de la placa de control", "");
+//            bot.sendMessage(CHAT_ID[user], "(test)Iniciando arranque de la placa de control", "");
 //          }
 //        break;
 //
 //        case 1:
 //          for(user=0; user<NUM_TEL_USERS; user++){
-//            bot.sendMessage(CHAT_ID[user], "El estado del frigorifico es correcto", "");
+//            bot.sendMessage(CHAT_ID[user], "(test)El estado del frigorifico es correcto", "");
 //          }
 //        break;
 //
 //        case 2:
 //          for(user=0; user<NUM_TEL_USERS; user++){
-//            bot.sendMessage(CHAT_ID[user], "La temperatura del frigorifico es demasiado alta", "");
+//            bot.sendMessage(CHAT_ID[user], "(test)La temperatura del frigorifico es demasiado alta", "");
 //          }
 //        break;
 //
 //        case 3:
 //          for(user=0; user<NUM_TEL_USERS; user++){
-//            bot.sendMessage(CHAT_ID[user], "El frigorifico se encuentra en revision", "");
+//            bot.sendMessage(CHAT_ID[user], "(test)El frigorifico se encuentra en revision", "");
 //          }
 //        break;
 //
 //        case 4:
 //          for(user=0; user<NUM_TEL_USERS; user++){
-//            bot.sendMessage(CHAT_ID[user], "El frigorifico esta revisado", "");
+//            bot.sendMessage(CHAT_ID[user], "(test)El frigorifico esta revisado", "");
 //          }
 //        break;
 //      }
