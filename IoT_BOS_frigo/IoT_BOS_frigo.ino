@@ -26,7 +26,7 @@
 //La Pt100 se encuentra en el 34
 
 
-#define N_TIMERMAX 480  //tiempo en medias horas para que salte la alarma
+#define N_TIMERMAX 4800  //tiempo en medias horas para que salte la alarma
 #define N_INTENTOS_WIFI_MAX 30
 
 #define BOT_TOKEN "1769477105:AAHHjNkaC8Wydb3qyRCTw6itfpX9a21uET0"
@@ -145,7 +145,7 @@ void setup() {
   pinMode(P_BUZZALM, OUTPUT);
    
   //config del pin de interrupcion de ACK
-  attachInterrupt(1, ISR_ACK, CHANGE);
+  attachInterrupt(1, ISR_ACK, FALLING);
 
   Serial.begin(115200);
   
@@ -253,6 +253,7 @@ void maquina_estados(int estado_f) {
   
   switch (estado_f) {
     case 0: //arranque inicial
+    Serial.print("ESTADO 0");
 
       if(!estado_arranque){
         for(tel_user=0; tel_user<NUM_TEL_USERS; tel_user++){
@@ -274,6 +275,7 @@ void maquina_estados(int estado_f) {
     break;
 
     case 1: //todo OK
+    Serial.print("ESTADO 1");
       if (estado_OK == 0 && en_mails){
         for(email_user=0; email_user<NUM_EMAIL_USERS; email_user++){
           result = sendEmail(asunto, remitente, "(test)El estado del frigorifico es correcto", EMAIL_LIST[email_user], false);
@@ -301,6 +303,7 @@ void maquina_estados(int estado_f) {
     break;
 
     case 2: //alarma SALIDA BUZZER
+    Serial.print("ESTADO 2");
       if (estado_ACK == 0 && en_mails){
         for(email_user=0; email_user<NUM_EMAIL_USERS; email_user++){
           result = sendEmail(asunto, remitente, "(test)La temperatura del frigorifico es demasiado alta", EMAIL_LIST[email_user], false);
@@ -325,6 +328,7 @@ void maquina_estados(int estado_f) {
     break;
 
     case 3: //en revision
+    Serial.print("ESTADO 3");
       if (estado_revision == 0 && en_mails){
         for(email_user=0; email_user<NUM_EMAIL_USERS; email_user++){
           result = sendEmail(asunto, remitente, "(test)El frigorifico se encuentra en revision", EMAIL_LIST[email_user], false);
@@ -350,6 +354,7 @@ void maquina_estados(int estado_f) {
     break;
 
     case 4: //revisado
+    Serial.print("ESTADO 4");
       if (estado_revisado == 0 && en_mails){
 
         for(email_user=0; email_user<NUM_EMAIL_USERS; email_user++){
@@ -386,8 +391,10 @@ void estados_automaticos() {
   if ((estado == 0 && temp_actual <= -65.0f) || (estado == 4 && temp_actual <= -70.0f))
     estado = 1;
 
-  else if ((estado == 0 || estado == 4)&& flag_alarma) //alarma por tiempo al haber entrado N veces en el timer 0 sin haber reiniciado el contador de entrada
+  else if ((estado == 0 || estado == 4)&& flag_alarma){ //alarma por tiempo al haber entrado N veces en el timer 0 sin haber reiniciado el contador de entrada
+    Serial.print("aaaa");
     estado = 2;
+  }
 
   else if (estado == 1 && temp_actual >= -60.0f)
     estado = 2;
