@@ -145,9 +145,9 @@ void setup() {
   pinMode(P_BUZZALM, OUTPUT);
    
   //config del pin de interrupcion de ACK
-  attachInterrupt(1, ISR_ACK, FALLING);
+  attachInterrupt(P_ACK, ISR_ACK, FALLING);
 
-  Serial.begin(115200);
+  //Serial.begin(115200);
   
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
