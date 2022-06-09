@@ -26,7 +26,7 @@
 //La Pt100 se encuentra en el 34
 
 
-#define N_TIMERMAX 4800  //tiempo en medias horas para que salte la alarma
+#define N_TIMERMAX 480  //tiempo en medias horas para que salte la alarma
 #define N_INTENTOS_WIFI_MAX 30
 
 #define BOT_TOKEN "1769477105:AAHHjNkaC8Wydb3qyRCTw6itfpX9a21uET0"
@@ -201,13 +201,16 @@ void loop() {
   //digitalWrite(P_LEDOK, HIGH);
   
   if(flag_timer || flag_ACK){ //entrada periodica con timer 0 o asincrona con pulsacion de ACK
+    Serial.print("Timer o pulsacion");
     pt100Value = analogRead(P_pt100);
     //temp_preop = VALOR_CALIBRACION * pt100Value;    
     //temp_actual = temp_preop / 4096.0f;
     temp_actual = pt100Value / VALOR_CALIBRACION;
+  
     //Serial.println(pt100Value);
     
     estados_automaticos();
+    Serial.print(estado);
     maquina_estados(estado);
     
     if(flag_timer) flag_timer = 0;
@@ -410,10 +413,10 @@ void estados_automaticos() {
   Al marcar un fragmento de código con el atributo IRAM_ATTR, estamos declarando que el código compilado se colocará en la RAM interna (IRAM) del ESP32.
   De lo contrario, el código se coloca en Flash. Y el flash en el ESP32 es mucho más lento que la RAM interna.
 */
-void IRAM_ATTR ISR_ACK() {
+void ISR_ACK() {
+  noInterrupts();
   //cambiar estado cuando se pulsa acuse de recibo (ESTADOS MANUALES)
-  Serial.print("ACK pulsado");
-  delay(150); // evita rebotes del pulsador
+  delay(400); // evita rebotes del pulsador
 
   flag_ACK = 1;
 
@@ -428,7 +431,8 @@ void IRAM_ATTR ISR_ACK() {
 
   else if (estado == 0) //bypass arranque
     estado = 1;
-    
+
+  interrupts();
   return;
 }
 
@@ -472,9 +476,9 @@ void IRAM_ATTR parp_mantenimiento(){
 /******************************************************************************************/
 
 void handleNewMessages(int numNewMessages) {
-  //Serial.println("handleNewMessages");
+
   int user = 0;
-  //Serial.println(String(numNewMessages));
+
   for (int i=0; i<numNewMessages; i++) {
     // Chat id of the requester
     String chat_id = String(bot.messages[i].chat_id);
@@ -491,7 +495,7 @@ void handleNewMessages(int numNewMessages) {
 
     // Print the received message
     String text = bot.messages[i].text;
-    //Serial.println(text);
+
     String from_name = bot.messages[i].from_name;
     
     
